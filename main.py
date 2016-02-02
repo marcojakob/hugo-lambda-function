@@ -1,6 +1,5 @@
 from __future__ import print_function
 
-import boto3
 import json
 import logging
 
@@ -23,10 +22,14 @@ def lambda_handler(event, context):
 
     urllib.urlretrieve (repourl + "/archive/master.zip", "/tmp/master.zip")
     zfile = zipfile.ZipFile('/tmp/master.zip')
-    zfile.extractall("/tmp/unzipped")
-    builddir = "/tmp/unzipped/" + reponame + "-master/"
+    zfile.extractall("/tmp")
+    builddir = "/tmp/" + reponame + "-master/"
 
     subprocess.call("/var/task/hugo_0.15_linux_amd64.go" , shell=True, cwd=builddir)
+    
     pushdir = builddir + "public/"
     bucketuri = "s3://" + reponame + "/"
-    subprocess.call("python /var/task/awscli.py s3 sync --size-only --delete --sse AES256 " + pushdir + " " + bucketuri, shell=True)
+    
+    subprocess.call("python /var/task/s3cmd/s3cmd sync --delete-removed"
+        + " --no-mime-magic --no-preserve"
+        + " " + pushdir + " " + bucketuri, shell=True)
