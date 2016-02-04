@@ -18,8 +18,10 @@ mv s3cmd-master s3cmd
 wget https://github.com/spf13/hugo/releases/download/v${HUGO_VERSION}/${HUGO_FILE}.tar.gz
 tar -xf ${HUGO_FILE}.tar.gz
 rm -f ${HUGO_FILE}.tar.gz
-mv ${HUGO_FILE}/${HUGO_FILE} ${HUGO_FILE}.go
+mv ${HUGO_FILE}/${HUGO_FILE} hugo.go
 rm -rf ${HUGO_FILE}
+touch ${HUGO_FILE}.version
+
 # cleanup
 find . -name "*.pyc" -delete
 
