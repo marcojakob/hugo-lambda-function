@@ -167,7 +167,7 @@ def acquire_lock(bucket):
                 # Just overwrite the invalid lock item with our own.
                 logger.error('Lock item for bucket "' + bucket + '" was older ' + 
                              'than 300s (' + lock_date + '). A Lambda function ' + 
-                             'did not release it. I'll overwrite it.')
+                             'did not release it. I will overwrite it.')
                 create_lock_item(bucket)
                 return
             
