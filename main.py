@@ -5,7 +5,7 @@ import logging
 import boto3
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import urllib
 import urllib2
@@ -92,8 +92,8 @@ def lambda_handler(event, context):
                                      'Amazon S3**\n\n' + e.output)
         raise Exception('Failed to sync generated site to Amazon S3: ' + 
                         e.output)
-    #finally:
-        #release_lock(github.repo_name)
+    finally:
+        release_lock(github.repo_name)
 
     # 4. Success!
     github.set_status('success', 'Successfully generated and deployed static site')
@@ -160,11 +160,14 @@ def acquire_lock(bucket):
                 return
             
             lock_date = datetime.strptime(lock_item['Item']['created']['S'], "%Y-%m-%d %H:%M:%S")
-                
+
             # Check if the lock item is more than 300s old (the max execution
             # duration of a Lambda function).
-            if lock_date + datetime.timedelta(seconds=300) > datetime.now():
+            if lock_date + timedelta(seconds=300) < datetime.now():
                 # Just overwrite the invalid lock item with our own.
+                logger.error('Lock item for bucket "' + bucket + '" was older ' + 
+                             'than 300s (' + lock_date + '). A Lambda function ' + 
+                             'did not release it. I'll overwrite it.')
                 create_lock_item(bucket)
                 return
             
