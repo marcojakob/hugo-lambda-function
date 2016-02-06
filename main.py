@@ -5,6 +5,7 @@ import logging
 import boto3
 import os
 import time
+from datetime import datetime
 
 import urllib
 import urllib2
@@ -15,6 +16,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 lambda_client = boto3.client('lambda')
+dynamodb_client = boto3.client('dynamodb')
 
 
 def lambda_handler(event, context):
@@ -75,8 +77,9 @@ def lambda_handler(event, context):
     pushdir = builddir + '/public/'
     bucketuri = 's3://' + github.repo_name + '/'
 
-    logger.info('Syncing to S3 bucket: ' + bucketuri)
     try:
+        acquire_lock(github.repo_name)
+        logger.info('Syncing to S3 bucket: ' + bucketuri)
         sync_time = time.time()
         subprocess.check_output('python /var/task/s3cmd/s3cmd sync ' + 
                                 '--delete-removed --no-mime-magic ' + 
@@ -89,6 +92,8 @@ def lambda_handler(event, context):
                                      'Amazon S3**\n\n' + e.output)
         raise Exception('Failed to sync generated site to Amazon S3: ' + 
                         e.output)
+    #finally:
+        #release_lock(github.repo_name)
 
     # 4. Success!
     github.set_status('success', 'Successfully generated and deployed static site')
@@ -135,6 +140,52 @@ def valid_event(sns, message):
                 branch + ' (' + ref + ')')
     return True
 
+
+def acquire_lock(bucket):
+    """ Tries to get a write lock for the specified bucket. 
+    If the lock was already acquired from another Lambda function, this
+    function sleeps and tries again. If the lock could be acquired, the 
+    function returns.
+    """
+    try:
+        sleep = 1
+        while True:
+            lock_item = dynamodb_client.get_item(TableName='lambdaLocks', 
+                                                 Key={'bucket':{'S':bucket}},
+                                                 ConsistentRead=True)
+            
+            if 'Item' not in lock_item:
+                # No lock item, we acquire it.
+                create_lock_item(bucket)
+                return
+            
+            lock_date = datetime.strptime(lock_item['Item']['created']['S'], "%Y-%m-%d %H:%M:%S")
+                
+            # Check if the lock item is more than 300s old (the max execution
+            # duration of a Lambda function).
+            if lock_date + datetime.timedelta(seconds=300) > datetime.now():
+                # Just overwrite the invalid lock item with our own.
+                create_lock_item(bucket)
+                return
+            
+            logger.info('Waiting to acquire lock. Sleeping for ' + str(sleep) + ' seconds')
+            time.sleep(sleep)
+            # Double the sleep time for the next iteration.
+            sleep = sleep * 2
+    except Exception as e:
+        logger.warning('Could not acquire lock for writing to S3. Will write anyway ' +
+                       'and hope nothing bad happens: ' + str(e))
+                            
+def create_lock_item(bucket):
+    logger.info('Acquired lock item for writing to S3.')
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    dynamodb_client.put_item(TableName='lambdaLocks', 
+                             Item={'bucket':{'S':bucket}, 'created':{'S':now}})
+                                            
+def release_lock(bucket):
+    dynamodb_client.delete_item(TableName='lambdaLocks', 
+                                Key={'bucket':{'S':bucket}})
+    
 
 class GitHubInfo(object):
     """ Class that represents information from GitHub."""
