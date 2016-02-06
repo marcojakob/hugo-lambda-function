@@ -36,9 +36,11 @@ def lambda_handler(event, context):
     # When an exception was thrown, Lambda automatically does two retries. 
     # This can lead to a situation where the retry does not contain the 
     # most recent commit.
-    if not github.is_latest_commit():
+    latest_sha = github.get_latest_sha()
+    if not github.sha == latest_sha:
         logger.info('Ignoring event because it does not contain the latest ' + 
-                    'commit.')
+                    'commit: event-sha: ' + github.sha + ' latest-sha: ' +
+                    latest_sha)
         return
     
     # We can start.
@@ -54,23 +56,23 @@ def lambda_handler(event, context):
         github.set_status('error', 'Failed to download latest commit ' +
                           'from GitHub')
         raise e
-
+        
     # 2. Hugo build.
     logger.info('Running Hugo in build directory: ' + builddir)
     try:
         hugo_time = time.time()
-        subprocess.check_output('/var/task/hugo.go', shell=True, cwd=builddir, stderr=subprocess.STDOUT)
+        subprocess.check_output('/var/task/hugo.go', shell=True, cwd=builddir + '/', stderr=subprocess.STDOUT)
         hugo_time = time.time() - hugo_time
         
     except subprocess.CalledProcessError as e:
-        github.set_status('error', 'Failed to generate website with Hugo')
-        github.create_commit_comment(':x: **Failed to generate website with ' + 
+        github.set_status('error', 'Failed to generate site with Hugo')
+        github.create_commit_comment(':x: **Failed to generate site with ' + 
                                      'Hugo**\n\n' + e.output)
-        raise Exception('Failed to generate website with Hugo: ' + 
+        raise Exception('Failed to generate site with Hugo: ' + 
                         e.output)
 
     # 3. Sync to S3.
-    pushdir = builddir + 'public/'
+    pushdir = builddir + '/public/'
     bucketuri = 's3://' + github.repo_name + '/'
 
     logger.info('Syncing to S3 bucket: ' + bucketuri)
@@ -82,23 +84,23 @@ def lambda_handler(event, context):
                                 bucketuri, shell=True, stderr=subprocess.STDOUT)
         sync_time = time.time() - sync_time
     except subprocess.CalledProcessError as e:
-        github.set_status('error', 'Failed to sync generated website to Amazon S3')
-        github.create_commit_comment(':x: **Failed to sync generated website to ' +
+        github.set_status('error', 'Failed to sync generated site to Amazon S3')
+        github.create_commit_comment(':x: **Failed to sync generated site to ' +
                                      'Amazon S3**\n\n' + e.output)
-        raise Exception('Failed to sync generated website to Amazon S3: ' + 
+        raise Exception('Failed to sync generated site to Amazon S3: ' + 
                         e.output)
 
     # 4. Success!
-    github.set_status('success', 'Successfully generated and deployed static website')
+    github.set_status('success', 'Successfully generated and deployed static site')
     total_time = time.time() - total_time
     stats = 'Repo download size: ' + str(download_size / 1000) + ' kilobytes\n' + \
             'Repo download time: ' + '%.3f' % download_time + ' seconds\n' + \
             'Hugo build time: ' + '%.3f' % hugo_time + ' seconds\n' + \
             'S3 sync time: ' + '%.3f' % sync_time + ' seconds\n' + \
             'Total time: ' + '%.3f' % total_time + ' seconds'
-    logger.info('Successfully generated and deployed static website\n' + stats)
+    logger.info('Successfully generated and deployed static site\n' + stats)
     github.create_commit_comment(':white_check_mark: **Sucessfully generated ' + 
-             'and deployed static website**\n\n' + stats)
+             'and deployed static site**\n\n' + stats)
 
 
 def valid_event(sns, message):
@@ -145,6 +147,7 @@ class GitHubInfo(object):
         self.ref = message['ref']
         self.sha = message['head_commit']['id']
         self.commit_url = message['head_commit']['url']
+        self.owner = message['repository']['owner']['name']
         self.repo_name = message['repository']['name']
         self.repo_full_name = message['repository']['full_name']
 
@@ -165,15 +168,17 @@ class GitHubInfo(object):
             raise Exception('No GitHub access token provided. Set ' +
                             '"github_token:[...]" as the lambda function ' +
                             'description.')
-            
-    def is_latest_commit(self):
-        """Returns true if it is the latest commit of this ref"""
+
+    def get_latest_sha(self):
+        """Returns the latest commit sha of this ref.
+        This function makes a request to the GitHub Api.
+        """
         url = 'https://api.github.com/repos/' + self.repo_full_name + \
               '/git/' + self.ref
         req = urllib2.Request(url)
         req.add_header('Authorization', 'token ' + self.github_token)
         response = json.load(urllib2.urlopen(req))
-        return response['object']['sha'] == self.sha
+        return response['object']['sha']
 
 
     def download(self):
@@ -182,7 +187,7 @@ class GitHubInfo(object):
         """
         
         url = 'https://api.github.com/repos/' + self.repo_full_name + \
-              '/zipball/' + self.ref
+              '/zipball/' + self.sha
         req = urllib2.Request(url)
         req.add_header('Authorization', 'token ' + self.github_token)
 
@@ -196,11 +201,13 @@ class GitHubInfo(object):
             
         # Unzip.
         zfile = zipfile.ZipFile('/tmp/repo.zip')
-        zfile.extractall('/tmp/unzipped')
+        zfile.extractall('/tmp')
         os.remove('/tmp/repo.zip')
 
         # Get the folder name of the extracted repository.
-        directory = '/tmp/unzipped/' + os.listdir('/tmp/unzipped')[0] + '/'
+        directory = '/tmp/' + self.owner + '-' + self.repo_name + '-' + self.sha
+        #directory = '/tmp/unzipped/' + os.listdir('/tmp/unzipped')[0]
+
         return (directory, download_size)
                 
 
