@@ -82,8 +82,8 @@ def lambda_handler(event, context):
                 logger.warning('After waiting to aquire the lock for S3 we are not ' +
                                'the latest commit any more: event-sha: ' + github.sha +
                                ' latest-sha: ' + latest_sha)
-                github.set_status('failure', 'Stopping build because this is not the ' + \
-                                  'latest commit any more')
+                github.set_status('failure', 'Stopping build because there is a newer commit')
+                github.create_commit_comment(':warning: **Stopping build because there is a newer commit**')
                 return
             
         logger.info('Syncing to S3 bucket: ' + bucketuri)
@@ -132,13 +132,13 @@ def acquire_lock(bucket):
     try:
         while True:
             lock_item = dynamodb_client.get_item(TableName='lambdaLocks', 
-                                                 Key={'bucket':{'S':bucket}},
+                                                 Key={'id':{'S':bucket}},
                                                  ConsistentRead=True)
             
             if 'Item' not in lock_item:
                 # No lock item, we acquire it.
                 create_lock_item(bucket)
-                return
+                return sleep
             
             lock_date = datetime.strptime(lock_item['Item']['created']['S'], "%Y-%m-%d %H:%M:%S")
 
@@ -150,14 +150,14 @@ def acquire_lock(bucket):
                              'than 300s (' + lock_date + '). A Lambda function ' + 
                              'did not release it. I will overwrite it.')
                 create_lock_item(bucket)
-                return
+                return sleep
             
             # Sleep for a few seconds.
-            logger.info('Waiting to acquire lock for writing to S3. Sleeping for 5 seconds')
+            logger.info('Waiting to acquire lock for S3. Sleeping for 5 seconds')
             time.sleep(5)
             sleep += 5
     except Exception as e:
-        logger.warning('Could not acquire lock for writing to S3. Will write anyway ' +
+        logger.warning('Could not acquire lock for S3. Will write anyway ' +
                        'and hope nothing bad happens: ' + str(e))
              
     return sleep
@@ -166,12 +166,12 @@ def create_lock_item(bucket):
     logger.info('Acquiring lock item for writing to S3.')
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     dynamodb_client.put_item(TableName='lambdaLocks', 
-                             Item={'bucket':{'S':bucket}, 'created':{'S':now}})
+                             Item={'id':{'S':bucket}, 'created':{'S':now}})
             
         
 def release_lock(bucket):
-    logger.info('Releasing lock item for writing to S3.')
-    dynamodb_client.delete_item(TableName='lambdaLocks', Key={'bucket':{'S':bucket}})
+    logger.info('Releasing lock item for S3.')
+    dynamodb_client.delete_item(TableName='lambdaLocks', Key={'id':{'S':bucket}})
     
 
 class GitHub(object):
