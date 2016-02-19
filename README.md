@@ -28,6 +28,9 @@ There is also an option for [scheduled events](http://docs.aws.amazon.com/lambda
 
 ## Usage
 
+Note: For the first website you need to follow all the steps below. For any additional website, only Step 3 is required. And, if used, a new scheduled event.
+
+
 ### Step 1: Create an SNS Topic
 
 1. Go to the AWS SNS console.
