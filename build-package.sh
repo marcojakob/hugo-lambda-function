@@ -25,9 +25,9 @@ touch ${HUGO_FILE}.version
 # cleanup
 find . -name "*.pyc" -delete
 
-# Use the local main script
+# Use the local lambda_function script
 # wget https://raw.githubusercontent.com/jolexa/hugo-lambda-function/master/main.py
-cp ${BASEDIR}/main.py ./
+cp ${BASEDIR}/lambda_function.py ./
 
 # create zip
 zip -r9 ${BASEDIR}/hugo-lambda-function.zip *
