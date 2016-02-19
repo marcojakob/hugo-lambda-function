@@ -56,8 +56,9 @@ def lambda_handler(event, context):
     logger.info('Running Hugo in build directory: ' + builddir)
     try:
         hugo_time = time.time()
-        subprocess.check_output('/var/task/hugo.go', shell=True, cwd=builddir + '/', 
-                                stderr=subprocess.STDOUT)
+        h_out = subprocess.check_output('/var/task/hugo.go', shell=True, cwd=builddir + '/', 
+                                       stderr=subprocess.STDOUT)
+        logger.info('Hugo output:\n' + h_out)
         hugo_time = time.time() - hugo_time
         
     except subprocess.CalledProcessError as e:
@@ -88,10 +89,11 @@ def lambda_handler(event, context):
             
         logger.info('Syncing to S3 bucket: ' + bucketuri)
         sync_time = time.time()
-        subprocess.check_output('python /var/task/s3cmd/s3cmd sync ' + 
-                                '--delete-removed --no-mime-magic ' + 
-                                '--no-preserve ' + pushdir + ' ' + 
-                                bucketuri, shell=True, stderr=subprocess.STDOUT)
+        s_out = subprocess.check_output('python /var/task/s3cmd/s3cmd sync ' + 
+                                        '--delete-removed --no-mime-magic ' + 
+                                        '--no-preserve --no-token-refresh ' + pushdir + ' ' + 
+                                        bucketuri, shell=True, stderr=subprocess.STDOUT)
+        logger.info('Sync output:\n' + s_out)
         sync_time = time.time() - sync_time
     except subprocess.CalledProcessError as e:
         github.set_status('error', 'Failed to sync generated site to Amazon S3')
