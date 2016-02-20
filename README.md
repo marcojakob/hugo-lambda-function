@@ -28,7 +28,7 @@ There is also an option for [scheduled events](http://docs.aws.amazon.com/lambda
 
 ## Usage
 
-Note: For the first website you need to follow all the steps below. For any additional website, only Step 3 is required. And, if used, a new scheduled event.
+Note: For the first website you need to follow all the steps below. For any additional website, only the webhook of the GitHub repo (step 3) and the new AWS S3 bucket (Step 9) must be created. And, if used, a new scheduled event.
 
 
 ### Step 1: Create an SNS Topic
@@ -194,6 +194,15 @@ To coordinate concurrently running Lambda functions, our function needs a simple
 3. Enter "lambdaLocks" as table name (this name must be entered exactly like this).
 4. Enter "id" as the primary key String.
 5. Click "Create".
+
+
+### Step 9: Create the S3 Bucket
+
+1. Opent the AWS S3 console.
+2. Click "Create Bucket".
+3. Choose a "Bucket Name".   
+**Important:** The bucket name must be the same as the GitHub repository name. And for S3 to work as a static website host the name must be the same as the domain.
+4. The "Region" should preferably be the same as the location of the Lambda function (for better sync performance).
 
 
 That's it. Now run some tests by commiting to your GitHub repository.
