@@ -91,7 +91,7 @@ def lambda_handler(event, context):
         sync_time = time.time()
         s_out = subprocess.check_output('python /var/task/s3cmd/s3cmd sync ' + 
                                         '--delete-removed --no-mime-magic ' + 
-                                        '--no-preserve --no-token-refresh ' + pushdir + ' ' + 
+                                        '--no-preserve ' + pushdir + ' ' + 
                                         bucketuri, shell=True, stderr=subprocess.STDOUT)
         logger.info('Sync output:\n' + s_out)
         sync_time = time.time() - sync_time
