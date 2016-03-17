@@ -7,10 +7,8 @@ BASEDIR=$(dirname $0)
 DIR=$(mktemp -d)
 cd $DIR
 
-# Fetch s3cmd from our forked repo.
-# TODO: If our pull requests (https://github.com/s3tools/s3cmd/pull/701) 
-# gets merged, we can fetch from the main s3cmd repo.
-wget https://github.com/makery/s3cmd/archive/master.zip
+# Fetch s3cmd.
+wget https://github.com/s3tools/s3cmd/archive/master.zip
 unzip master.zip
 rm -f master.zip
 mv s3cmd-master s3cmd
