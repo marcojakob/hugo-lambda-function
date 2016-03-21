@@ -8,10 +8,16 @@ DIR=$(mktemp -d)
 cd $DIR
 
 # Fetch s3cmd.
-wget https://github.com/s3tools/s3cmd/archive/master.zip
+# TODO: Replace with https://github.com/s3tools/s3cmd/archive/master.zip once
+# the svg-mimetype problem is fixed.
+wget https://github.com/makery/s3cmd/archive/master.zip
 unzip master.zip
 rm -f master.zip
 mv s3cmd-master s3cmd
+
+
+# Install mime magic into s3cmd folder (doesn't seem to guess the mime-types well).
+# pip install python-magic -t ./s3cmd
 
 
 # Fetch hugo release (statically compiled go binary)
@@ -21,6 +27,7 @@ rm -f ${HUGO_FILE}.tar.gz
 mv ${HUGO_FILE}/${HUGO_FILE} hugo.go
 rm -rf ${HUGO_FILE}
 touch ${HUGO_FILE}.version
+
 
 # cleanup
 find . -name "*.pyc" -delete
