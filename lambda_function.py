@@ -77,7 +77,7 @@ def lambda_handler(event, context):
     pushdir = builddir + '/public/'
     bucketuri = 's3://'
     if github.draft
-        bucketuri += 'draft'
+        bucketuri += 'draft.'
     bucketuri += github.repo + '/'
 
     try:
