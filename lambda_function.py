@@ -56,7 +56,11 @@ def lambda_handler(event, context):
     logger.info('Running Hugo in build directory: ' + builddir)
     try:
         hugo_time = time.time()
-        h_out = subprocess.check_output('/var/task/hugo.go', shell=True, cwd=builddir + '/',
+
+        cmd = '/var/task/hugo.go'
+        if github.draft
+            cmd += ' --buildDrafts --buildFuture'
+        h_out = subprocess.check_output(cmd, shell=True, cwd=builddir + '/',
                                        stderr=subprocess.STDOUT)
         logger.info('Hugo output:\n' + h_out)
         hugo_time = time.time() - hugo_time
@@ -71,10 +75,13 @@ def lambda_handler(event, context):
 
     # 4. Sync to S3.
     pushdir = builddir + '/public/'
-    bucketuri = 's3://' + github.repo + '/'
+    bucketuri = 's3://'
+    if github.draft
+        bucketuri += 'draft'
+    bucketuri += github.repo + '/'
 
     try:
-        sleep = acquire_lock(github.repo)
+        sleep = acquire_lock(bucketuri)
         if sleep > 0:
             # After sleeping we need to test if we are still the latest commit.
             latest_sha = GitHub.get_latest_sha(owner=github.owner, repo=github.repo,
@@ -102,7 +109,7 @@ def lambda_handler(event, context):
         raise Exception('Failed to sync generated site to Amazon S3: ' +
                         e.output)
     finally:
-        release_lock(github.repo)
+        release_lock(bucketuri)
 
 
     # 5. Success!
@@ -183,7 +190,7 @@ class GitHub(object):
         """ Initializes the GitHub object."""
 
         # Get the GitHub token from the Lambda function description.
-        self._init_token(context)
+        self._read_function_description(context)
 
         # Determine the event type.
         if 'event_type' in event and event['event_type'] == 'scheduled':
@@ -204,11 +211,13 @@ class GitHub(object):
             self._init_github_event(github_event, message)
 
 
-    def _init_token(self, context):
-        """Initializes the GitHub access token.
+    def _read_function_description(self, context):
+        """Reads the description from the Lambda function console.
 
-        Searches the description from the Lambda function console for the
-        token. This is a workaround to get some sort of runtime configuration.
+        This is a workaround to get some sort of runtime configuration.
+        The description contains:
+        * The GitHub access token "github_token" (required)
+        * Draft "draft" (optional)
         """
 
         lambda_desc = lambda_client.get_function_configuration(
@@ -222,12 +231,19 @@ class GitHub(object):
                             'Example: {"github_token": "..."}')
 
         if lambda_desc_json['github_token'] is not None:
-            logger.info('Found GitHub access token.')
+            logger.info('Found GitHub access token in Lambda description.')
             self.token = lambda_desc_json['github_token']
         else:
             raise Exception('No valid GitHub access token found. Please provide ' +
                             'the access token as the Lambda function discription. ' +
                             'Example: {"github_token": "..."}')
+
+        if lambda_desc_json['draft'] is not None:
+            logger.info('Found draft property in Lambda function description: ' +
+                        lambda_desc_json['draft'])
+            self.draft = lambda_desc_json['draft']
+        else:
+            self.draft = false
 
 
     def _init_scheduled_event(self, event):
@@ -366,6 +382,10 @@ class GitHub(object):
         Possible states are: pending, success, error, or failure.
         """
 
+        if self.draft:
+            logger.info('Ignoring set_status for drafts')
+            return
+
         logger.info('Setting status "' + state + '" to commit ' + self.sha)
 
         payload = {
@@ -421,6 +441,10 @@ class GitHub(object):
 
     def create_commit_comment(self, comment):
         """ Creates a commit message."""
+
+        if self.draft:
+            comment = ':construction: **-- Build with DRAFTS and FUTURE CONTENT ' +
+                      '--**\n\n ' + comment
 
         payload = {
           'body': comment
