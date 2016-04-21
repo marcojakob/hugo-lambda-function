@@ -58,7 +58,7 @@ def lambda_handler(event, context):
         hugo_time = time.time()
 
         cmd = '/var/task/hugo.go'
-        if github.draft
+        if github.draft:
             cmd += ' --buildDrafts --buildFuture'
         h_out = subprocess.check_output(cmd, shell=True, cwd=builddir + '/',
                                        stderr=subprocess.STDOUT)
@@ -76,7 +76,7 @@ def lambda_handler(event, context):
     # 4. Sync to S3.
     pushdir = builddir + '/public/'
     bucketuri = 's3://'
-    if github.draft
+    if github.draft:
         bucketuri += 'draft.'
     bucketuri += github.repo + '/'
 
@@ -230,7 +230,7 @@ class GitHub(object):
                             'the access token as the Lambda function discription. ' +
                             'Example: {"github_token": "..."}')
 
-        if lambda_desc_json['github_token'] is not None:
+        if 'github_token' in lambda_desc_json:
             logger.info('Found GitHub access token in Lambda description.')
             self.token = lambda_desc_json['github_token']
         else:
@@ -238,12 +238,12 @@ class GitHub(object):
                             'the access token as the Lambda function discription. ' +
                             'Example: {"github_token": "..."}')
 
-        if lambda_desc_json['draft'] is not None:
+        if 'draft' in lambda_desc_json:
             logger.info('Found draft property in Lambda function description: ' +
-                        lambda_desc_json['draft'])
+                        str(lambda_desc_json['draft']))
             self.draft = lambda_desc_json['draft']
         else:
-            self.draft = false
+            self.draft = False
 
 
     def _init_scheduled_event(self, event):
@@ -360,7 +360,7 @@ class GitHub(object):
         zfile = zipfile.ZipFile('/tmp/repo.zip')
         try:
             zfile.extractall('/tmp')
-        except Exception e:
+        except Exception as e:
             github.set_status('error', 'Failed to generate site with Hugo')
             github.create_commit_comment(':x: **Failed to extract Repo Zip ' +
                                          'from GitHub**\n\n' + e.output)
@@ -443,8 +443,8 @@ class GitHub(object):
         """ Creates a commit message."""
 
         if self.draft:
-            comment = ':construction: **-- Build with DRAFTS and FUTURE CONTENT ' +
-                      '--**\n\n ' + comment
+            comment = ':construction: **Generated with DRAFTS and FUTURE CONTENT' + \
+                      '** :construction:\n\n---\n\n ' + comment
 
         payload = {
           'body': comment
