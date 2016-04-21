@@ -76,9 +76,19 @@ def lambda_handler(event, context):
     # 4. Sync to S3.
     pushdir = builddir + '/public/'
     bucketuri = 's3://'
+    repo = github.repo
     if github.draft:
         bucketuri += 'draft.'
-    bucketuri += github.repo + '/'
+
+        # Create a robots file so search engines ingore draft websites.
+        with open(pushdir + 'robots.txt', 'w+') as f:
+            # w+ overwrites the existing file if the file exists.
+            f.write('User-agent: *\nDisallow: /')
+
+        if repo.startswith('www.'):
+            repo = repo[4:]
+
+    bucketuri += repo + '/'
 
     try:
         sleep = acquire_lock(bucketuri)
