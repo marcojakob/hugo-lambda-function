@@ -56,10 +56,9 @@ def lambda_handler(event, context):
     logger.info('Running Hugo in build directory: ' + builddir)
     try:
         hugo_time = time.time()
-
         cmd = '/var/task/hugo.go'
         if github.draft:
-            cmd += ' --buildDrafts --buildFuture'
+            cmd += ' --buildDrafts --buildFuture --disableRSS --disableSitemap'
         h_out = subprocess.check_output(cmd, shell=True, cwd=builddir + '/',
                                        stderr=subprocess.STDOUT)
         logger.info('Hugo output:\n' + h_out)
