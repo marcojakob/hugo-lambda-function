@@ -19,7 +19,7 @@ The idea of this repo is to build a zip package that can be deployed to AWS Lamb
 1. A new commit is pushed to GitHub.
 2. The GitHub webhook notifies Amazon SNS.
 3. The Lambda function fires on the SNS event.
-4. The Lambda function creates a 'pending' status for the commit. 
+4. The Lambda function creates a 'pending' status for the commit.
 5. It downloads the commit as zip file from GitHub. Then it uses Hugo to generate the static website and syncs it to S3.
 6. After a successful deployment, Lambda sets the GitHub commit status to 'success'.
 
@@ -126,7 +126,7 @@ We also need a role to grant permissions to the Lambda function we will create l
 }
 ```
 
-With this policy, your Lambda function will have access to AWS S3 and DynamoDB and also allow inspection of a Lambda function and logging. 
+With this policy, your Lambda function will have access to AWS S3 and DynamoDB and also allow inspection of a Lambda function and logging.
 
 
 ### Step 3: Set up the GitHub Webhook
@@ -224,6 +224,59 @@ If you want to run the Lambda function not just on a GitHub push but also schedu
 ```
 {"event_type": "scheduled", "owner": "Your GitHub username goes here", "repo": "Your GitHub repo name goes here", "ref": "heads/master"}
 ```
+
+
+## Draft Bucket
+
+The Lambda function has support for draft websites. The draft website lives
+under the `draft.` subdomain (www. is removed, everything else is used as is).
+
+To enable draft websites we need to do the following:
+
+1. Create a second Lambda function that matches the normal Lambda function
+descripbed above.
+2. Add `"draft":true` to the JSON in the Lambda description (where the Github
+  token is).
+3. Go the SNS Topic and create a new subscription for the draft Lambda function.
+4. Create a new S3 bucket (`draft.example.com`).
+5. Add the following bucket policy:
+```
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "Allow password.html for all requesters",
+			"Effect": "Allow",
+			"Principal": "*",
+			"Action": "s3:GetObject",
+			"Resource": "arn:aws:s3:::draft.example.com/password.html"
+		},
+		{
+			"Sid": "Allow everything else if redirected to",
+			"Effect": "Allow",
+			"Principal": "*",
+			"Action": "s3:GetObject",
+			"Resource": "arn:aws:s3:::draft.example.com/*",
+			"Condition": {
+				"StringLike": {
+					"aws:Referer": "*://draft.example.com/*"
+				}
+			}
+		}
+	]
+}
+```
+This will only allow access to the website if the referer is our website.
+See also http://xingdig.com/blog/password-protecting-an-s3-website/
+
+6. Set the "Error document" to `password.html` (instead of `404.html` or similar).
+7. Now, all we need is to provide a `password.html` file that prompts the user
+for a password. If it is correct, it redirects the user to the requested site.
+For an example of such an HTML file see [password.html](password.html) and
+[password.txt](password.txt).
+8. Hugo has a variable `.Site.BuildDrafts`. With this variable we can detect
+if we're building the draft or the normal website. This enables us to add a
+warning to the user that he is on the draft website. 
 
 
 ## Future
