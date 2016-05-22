@@ -135,6 +135,7 @@ With this policy, your Lambda function will have access to AWS S3 and DynamoDB a
 2. Click on "Settings" in the sidebar.
 3. Click on "Webhooks & Services".
 4. Click the "Add service" dropdown, then click "AmazonSNS". Fill out the form (supplying the IAM user credentials you created in Step 2), then click "Add service". (Note that the label says "topic", but it requires the entire ARN, not just the topic name.)
+5. Make sure that the GitHub user has write access to this repository.
 
 Now GitHub actions will publish to your SNS topic.
 
